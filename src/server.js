@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 // 📁 Archivo donde se guardan las confirmaciones
-const dataPath = path.join(__dirname, "../backend/confirmaciones.json");
+const dataPath = path.join(__dirname, "./confirmaciones.json");
 
 // Si no existe, lo creamos vacío
 if (!fs.existsSync(dataPath)) {
