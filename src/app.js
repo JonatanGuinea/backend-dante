@@ -2,9 +2,12 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import cors from "cors";
-import nodemailer from "nodemailer";
 import { fileURLToPath } from "url";
+import dotenv from "dotenv";
+import "dotenv/config";
+import nodemailer from "nodemailer";
 
+dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -44,30 +47,47 @@ app.post("/api/confirmar", async (req, res) => {
     fecha: new Date().toISOString(),
   };
 
+  // Guardar en JSON
   const data = JSON.parse(fs.readFileSync(dataPath, "utf-8"));
   data.push(nuevaConfirmacion);
   fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
 
-  // ✉️ Enviar email al organizador
-  try {
-    await transporter.sendMail({
-      from: `"Confirmaciones 🎉" <${process.env.EMAIL_USER}>`,
-      to: process.env.DEST_EMAIL, // a dónde querés que llegue el aviso
-      subject: "Nueva confirmación de asistencia",
-      text: `${nombre} confirmó ${cantidad} persona(s).`,
-      html: `<h2>Nueva confirmación 🎉</h2>
-             <p><strong>Nombre:</strong> ${nombre}</p>
-             <p><strong>Cantidad:</strong> ${cantidad}</p>
-             <p><em>${new Date().toLocaleString()}</em></p>`,
-    });
-
-    console.log("📧 Email enviado correctamente");
-  } catch (error) {
-    console.error("❌ Error al enviar el email:", error);
-  }
-
+  // ✅ RESPONDE rápido al usuario
   res.json({ message: "Confirmación guardada correctamente 🎉" });
+
+  // ✉️ Enviar correo en segundo plano
+  (async () => {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+
+      await transporter.sendMail({
+        from: `"Confirmaciones 🎉" <${process.env.EMAIL_USER}>`,
+        to: process.env.DEST_EMAIL,
+        subject: "Nueva confirmación de asistencia 🎂",
+        html: `
+          <div style="font-family:sans-serif; background:#f7f7f7; padding:20px; border-radius:10px;">
+            <h2 style="color:#2E7D32;">Nueva confirmación 🎉</h2>
+            <p><b>Nombre:</b> ${nombre}</p>
+            <p><b>Cantidad:</b> ${cantidad}</p>
+            <p><i>${new Date().toLocaleString()}</i></p>
+          </div>
+        `,
+      });
+
+      console.log(`📧 Email enviado: ${nombre} (${cantidad} personas)`);
+    } catch (error) {
+      console.error("❌ Error al enviar el email:", error);
+    }
+  })();
 });
+
+
 
 // 📋 GET: obtener confirmaciones
 app.get("/api/confirmaciones", (req, res) => {
