@@ -2,6 +2,7 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import cors from "cors";
+import nodemailer from "nodemailer";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -19,8 +20,17 @@ if (!fs.existsSync(dataPath)) {
   fs.writeFileSync(dataPath, "[]", "utf-8");
 }
 
+// ✉️ Configurar transporte de correo (usa tus credenciales)
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER, // tu email
+    pass: process.env.EMAIL_PASS, // contraseña o App Password
+  },
+});
+
 // 📩 POST: guardar confirmación
-app.post("/api/confirmar", (req, res) => {
+app.post("/api/confirmar", async (req, res) => {
   const { nombre, cantidad } = req.body;
 
   if (!nombre || !cantidad) {
@@ -31,60 +41,39 @@ app.post("/api/confirmar", (req, res) => {
     id: Date.now(),
     nombre,
     cantidad,
-    fecha: new Date().toISOString()
+    fecha: new Date().toISOString(),
   };
 
   const data = JSON.parse(fs.readFileSync(dataPath, "utf-8"));
   data.push(nuevaConfirmacion);
   fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
 
+  // ✉️ Enviar email al organizador
+  try {
+    await transporter.sendMail({
+      from: `"Confirmaciones 🎉" <${process.env.EMAIL_USER}>`,
+      to: process.env.DEST_EMAIL, // a dónde querés que llegue el aviso
+      subject: "Nueva confirmación de asistencia",
+      text: `${nombre} confirmó ${cantidad} persona(s).`,
+      html: `<h2>Nueva confirmación 🎉</h2>
+             <p><strong>Nombre:</strong> ${nombre}</p>
+             <p><strong>Cantidad:</strong> ${cantidad}</p>
+             <p><em>${new Date().toLocaleString()}</em></p>`,
+    });
+
+    console.log("📧 Email enviado correctamente");
+  } catch (error) {
+    console.error("❌ Error al enviar el email:", error);
+  }
+
   res.json({ message: "Confirmación guardada correctamente 🎉" });
 });
 
-// import { db } from "./src/config/db.js";
-
-// app.post("/api/confirmar", async (req, res) => {
-//   const { nombre, cantidad } = req.body;
-
-//   if (!nombre || !cantidad) {
-//     return res.status(400).json({ message: "Faltan datos" });
-//   }
-
-//   try {
-//     await db.query("INSERT INTO confirmaciones (nombre, cantidad) VALUES (?, ?)", [nombre, cantidad]);
-//     res.status(201).json({ message: "Confirmación guardada correctamente" });
-//   } catch (error) {
-//     console.error("Error al guardar:", error);
-//     res.status(500).json({ message: "Error interno del servidor" });
-//   }
-// });
-
-// app.get("/api/confirmaciones", async (req, res) => {
-//   const [rows] = await db.query("SELECT * FROM confirmaciones ORDER BY fecha DESC");
-//   res.json(rows);
-// });
-
-
-
-
+// 📋 GET: obtener confirmaciones
 app.get("/api/confirmaciones", (req, res) => {
   const data = JSON.parse(fs.readFileSync(dataPath, "utf-8"));
   res.json(data);
 });
 
-// 🚀 Servir el frontend compilado
-const frontendPath = path.join(__dirname, "../frontend/dist");
-app.use(express.static(frontendPath));
-
-// Cualquier otra ruta → React
-app.use((req, res) => {
-  res.sendFile(path.join(frontendPath, "index.html"));
-});
-
-
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`✅ Servidor activo en puerto ${PORT}`));
-
-// app.listen(process.env.PORT, () => {
-//   console.log(`Servidor corriendo en puerto ${process.env.PORT}`);
-// });
