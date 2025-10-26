@@ -23,7 +23,7 @@ app.post("/api/confirmar", async (req, res) => {
     // Enviar email con Resend
     await resend.emails.send({
       from: "onboarding@resend.dev",
-      to: [process.env.EMAIL_TO,"valentinavena@gmail.com"]
+      to: [process.env.EMAIL_TO,"valentinavena@gmail.com"],
       subject: "Nueva confirmación de asistencia 🎂",
       html: `
         <h2>🎉 Nueva Confirmación</h2>
